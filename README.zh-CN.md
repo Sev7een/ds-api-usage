@@ -24,12 +24,12 @@
 │  • fetchBalance()             ← credentials.resolve('DEEPSEEK_API_KEY')      │
 │      → subprocess curl → https://api.deepseek.com/user/balance               │
 │      （web.fetch 无法携带 Authorization 头，故用 curl）                       │
-│  • harness.handle('dsapi:snapshot')  ← 供 Client 调用的私有 RPC               │
+│  • webServer.register('/ds-api-usage/snapshot')  ← 供 Client 读取的 JSON 端点 │
 └──────────────────────────────────────────────────────────────────────────────┘
-                                    │ host.call('dsapi:snapshot')
-                                    ▼
+                              │ fetch('/ds-api-usage/snapshot')
+                              ▼
 ┌────────────────────────────── Client（浏览器）───────────────────────────────┐
-│ client/index.js                                                             │
+│ client/bundle.js（web bundle；client/index.js 为动态插件源码）               │
 │  • slots.inject('settings.section')  → 新增设置页「API用量」                   │
 │  • 余额卡片 + 3 张指标卡 + 24h 时间线柱状图                                  │
 │  • 每 30 秒通过 ctx.interval 自动刷新                                        │
@@ -48,20 +48,39 @@
 
 ## 安装
 
+### 通过 `dsh plugin add` 安装（推荐，GitHub 或 npm）
+
+直接从本 GitHub 仓库安装：
+
+```bash
+dsh plugin --profile web add github:Sev7een/ds-api-usage
+```
+
+或发布到 npm 后：
+
+```bash
+dsh plugin --profile web add dsh-plugin-ds-api-usage
+```
+
+`dsh plugin` 会在 profile 目录中转发给 pnpm，并将包调和进 profile 的 bundle 列表（`dsh.profile.bundles`）。包内 `cordis.patch.yml`（经 `package.json` 的 `dsh.bundle.patch` 声明）随后把插件行插入宿主组合；`dsh.client` 声明则让 web 外壳加载 `client/bundle.js` 作为设置页。
+
 ### 作为动态插件（开发 / 会话级）
 
 原版是会话级动态 Cordis 插件，通过 `cordis_define` / `cordis_run` 创建（参见 [DeepSeek Harness 文档](https://github.com/deepseek-ai/DeepSeek-Harness)）。`code.host` 的函数体即 `src/index.js` 去掉 `module.exports` 包装；`code.client` 的函数体即 `client/index.js` 去掉包装。
 
-### 作为组合插件（持久化）
+> 注意：动态形态使用沙箱私有的 `harness.handle` / `host.call` 通道（`client/index.js`），而静态 bundle 形态（`client/bundle.js`）通过 HTTP 路由 `/ds-api-usage/snapshot` 与 Host 通信。修改协议时请保持两者同步。
 
-在宿主组合（`cordis.yml`）中添加指向本包的一行，例如：
+### 作为组合插件（持久化，手动）
+
+在你的 profile 的宿主组合（`cordis.patch.yml`）中添加：
 
 ```yaml
-- id: ds-api-usage
-  name: './plugins/ds-api-usage'
+- insert:
+    - id: ds-api-usage
+      name: 'dsh-plugin-ds-api-usage'
 ```
 
-或发布到 npm 后按包名引用。本插件属于 **Host 平面**：它读取 Host 的 `credentials`、`subprocess`、`timer` 服务，并将客户端设置页注册到根作用域的 `settings.section` 插槽，因此应放在**宿主组合**中，而不是某个 agent preset 内。
+或不安装包、以相对路径指向本仓库。本插件属于 **Host 平面**：它读取 Host 的 `credentials`、`subprocess`、`timer`、`webServer` 服务，并将客户端设置页注册到根作用域的 `settings.section` 插槽，因此应放在**宿主组合**中，而不是某个 agent preset 内。
 
 ### 依赖要求
 

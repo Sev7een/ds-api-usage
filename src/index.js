@@ -9,8 +9,16 @@
  *  2. Resolve the deployment's DeepSeek credential (`DEEPSEEK_API_KEY`) and
  *     query the official `/user/balance` endpoint for the account balance.
  *
- * The Client half (`client/index.js`) calls the private RPC method
- * `dsapi:snapshot` to render the settings page.
+ * The Client half (`client/bundle.js`) fetches the JSON snapshot from the
+ * HTTP route registered below (`/ds-api-usage/snapshot`) and renders the
+ * settings page.
+ *
+ * Communication is deliberately NOT the dynamic-package `harness.handle` /
+ * `host.call` pair: that channel exists only inside the dynamic Cordis
+ * sandbox. As a static bundle installed via `dsh plugin add`, the host half
+ * exposes an HTTP endpoint through the `webServer` service instead, and the
+ * browser half calls it with plain `fetch` (the bundle runs in the real
+ * page, not a sandbox).
  *
  * Note: token counts come straight from the provider-reported `usage` chunk
  * (cache hit / miss are already disjoint, matching DeepSeek's own billing
@@ -188,9 +196,8 @@ module.exports = {
     ctx.interval(() => { fetchBalance(false).catch(() => {}) }, 60000)
     fetchBalance(false).catch(() => {})
 
-    // ── RPC for the Client half ──────────────────────────────────────────────
-    harness.handle('dsapi:snapshot', async (args) => {
-      const force = !!(args && args.force)
+    // ── snapshot assembly (shared by the HTTP route) ─────────────────────────
+    async function buildSnapshot(force) {
       const balance = await fetchBalance(force)
       const now = Date.now()
       const hourlyList = [...hourly.values()]
@@ -216,6 +223,28 @@ module.exports = {
         daily: dailyList,
         pricingNote: 'Cost is an estimate in CNY from DeepSeek public list prices (cache hit / miss / output); for reference only.',
       }
-    })
+    }
+
+    // ── HTTP route for the Client half ───────────────────────────────────────
+    // `?force=1` forces a fresh balance fetch; otherwise a 30s-cached value is
+    // served. JSON body; errors surface as a 500 with a JSON error object.
+    const webServer = ctx.get('webServer')
+    if (webServer !== undefined) {
+      ctx.effect(() => webServer.register({
+        kind: 'exact',
+        path: '/ds-api-usage/snapshot',
+        handler: async (req, res) => {
+          try {
+            const force = new URL(req.url || '/', 'http://dsh.local').searchParams.get('force') === '1'
+            const snapshot = await buildSnapshot(force)
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify(snapshot))
+          } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            res.end(JSON.stringify({ ok: false, error: String((e && e.message) || e) }))
+          }
+        },
+      }))
+    }
   },
 }
