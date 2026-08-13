@@ -98,8 +98,8 @@ window.__ModuleLoader__.load({
 
       React.useEffect(function () {
         load(false)
-        var dispose = ctx.interval(function () { load(false) }, 30000)
-        return function () { dispose() }
+        var id = setInterval(function () { load(false) }, 30000)
+        return function () { clearInterval(id) }
       }, [])
 
       var buckets = snap ? snap.hourly : []
@@ -167,7 +167,7 @@ window.__ModuleLoader__.load({
       )
     }
 
-    var inject = ["timer", "slots"]
+    var inject = ["slots"]
 
     function apply(ctx) {
       // styles: bundle runs in the real page — inject a style element and
