@@ -42,7 +42,7 @@ const DAILY_KEEP_MS = 14 * 86400 * 1000
 
 module.exports = {
   name: 'ds-api-usage',
-  inject: ['timer'],
+  inject: ['timer', 'webServer'],
 
   apply(ctx) {
     const hourly = new Map()
@@ -228,23 +228,22 @@ module.exports = {
     // ── HTTP route for the Client half ───────────────────────────────────────
     // `?force=1` forces a fresh balance fetch; otherwise a 30s-cached value is
     // served. JSON body; errors surface as a 500 with a JSON error object.
-    const webServer = ctx.get('webServer')
-    if (webServer !== undefined) {
-      ctx.effect(() => webServer.register({
-        kind: 'exact',
-        path: '/ds-api-usage/snapshot',
-        handler: async (req, res) => {
-          try {
-            const force = new URL(req.url || '/', 'http://dsh.local').searchParams.get('force') === '1'
-            const snapshot = await buildSnapshot(force)
-            res.writeHead(200, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify(snapshot))
-          } catch (e) {
-            res.writeHead(500, { 'Content-Type': 'application/json' })
-            res.end(JSON.stringify({ ok: false, error: String((e && e.message) || e) }))
-          }
-        },
-      }))
-    }
+    // `webServer` is a hard dependency (declared in inject), so the plugin
+    // only activates once the web server is ready and the route always lands.
+    ctx.effect(() => ctx.webServer.register({
+      kind: 'exact',
+      path: '/ds-api-usage/snapshot',
+      handler: async (req, res) => {
+        try {
+          const force = new URL(req.url || '/', 'http://dsh.local').searchParams.get('force') === '1'
+          const snapshot = await buildSnapshot(force)
+          res.writeHead(200, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify(snapshot))
+        } catch (e) {
+          res.writeHead(500, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: false, error: String((e && e.message) || e) }))
+        }
+      },
+    }))
   },
 }
