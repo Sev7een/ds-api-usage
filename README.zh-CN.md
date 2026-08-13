@@ -2,11 +2,7 @@
 
 [English](./README.md) | **简体中文**
 
-为 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 提供**实时的 DeepSeek API 余额与用量时间线**：一个设置页，展示账户余额、估算消费金额、Token 数量与 API 请求次数（最近 24 小时），以类似 DeepSeek 官方平台用量页的时间线柱状图呈现。
-
-> **项目状态**：本包提取自已运行于 DeepSeek Harness 实例中的会话级动态 Cordis 插件（插件 `dsau-2`、包 `pkg-7`）。以独立插件的形式发布，便于审查、改进与回馈上游。
-
----
+安装后，打开 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 的**设置 → API用量**页面，即可查看 DeepSeek API 用量。页面展示账户余额、最近 24 小时的估算消费金额、Token 数量与 API 请求次数，并以类似 DeepSeek 官方平台用量页的时间线柱状图呈现。
 
 ## 功能特性
 

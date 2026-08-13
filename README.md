@@ -2,11 +2,7 @@
 
 **English** | [简体中文](./README.zh-CN.md)
 
-Real-time **DeepSeek API balance** and **usage timeline** for [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness): a settings page showing account balance, estimated spend, token counts and API request count over the last 24 hours, rendered as a timeline bar chart similar to the official DeepSeek platform usage page.
-
-> **Project status**: this package was extracted from a session-scoped dynamic Cordis plugin (plugin `dsau-2`, package `pkg-7`) that is running live in a DeepSeek Harness instance. It is published here as a standalone plugin so it can be reviewed, improved, and contributed back.
-
----
+After installation, open **Settings → API Usage** in [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) to view your DeepSeek API usage. The page shows your account balance, estimated spend, token counts, and API request count over the last 24 hours, rendered as a timeline bar chart similar to the official DeepSeek platform usage page.
 
 ## Features
 
