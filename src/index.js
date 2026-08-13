@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * DS API Usage — Host half
+ * DHS API Usage — Host half
  *
  * Two jobs:
  *  1. Listen to the `llm/stream` waterfall and fold every real model call's

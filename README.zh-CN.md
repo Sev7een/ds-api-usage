@@ -1,4 +1,4 @@
-# DS API Usage — DeepSeek Harness 插件
+# DHS API Usage — DeepSeek Harness 插件
 
 [English](./README.md) | **简体中文**
 

@@ -1,7 +1,7 @@
 'use strict'
 
 /**
- * DS API Usage — Client half
+ * DHS API Usage — Client half
  *
  * Registers a new settings page ("API用量") that renders:
  *  - a balance card (total / granted / topped-up, availability badge),

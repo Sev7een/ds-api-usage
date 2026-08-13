@@ -1,4 +1,4 @@
-# DS API Usage — DeepSeek Harness plugin
+# DHS API Usage — DeepSeek Harness plugin
 
 **English** | [简体中文](./README.zh-CN.md)
 
