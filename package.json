@@ -1,0 +1,26 @@
+{
+  "name": "dsh-plugin-ds-api-usage",
+  "version": "0.1.0",
+  "description": "DeepSeek Harness plugin: real-time DeepSeek API balance and usage timeline (cost / tokens / request count), rendered in a settings page.",
+  "license": "MIT",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "cordis",
+    "plugin",
+    "deepseek",
+    "api-usage",
+    "balance"
+  ],
+  "main": "src/index.js",
+  "files": [
+    "src",
+    "client"
+  ],
+  "scripts": {
+    "check": "node --check src/index.js && node --check client/index.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

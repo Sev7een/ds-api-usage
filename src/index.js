@@ -1,0 +1,221 @@
+'use strict'
+
+/**
+ * DS API Usage — Host half
+ *
+ * Two jobs:
+ *  1. Listen to the `llm/stream` waterfall and fold every real model call's
+ *     provider-reported token usage into in-memory hourly/daily buckets.
+ *  2. Resolve the deployment's DeepSeek credential (`DEEPSEEK_API_KEY`) and
+ *     query the official `/user/balance` endpoint for the account balance.
+ *
+ * The Client half (`client/index.js`) calls the private RPC method
+ * `dsapi:snapshot` to render the settings page.
+ *
+ * Note: token counts come straight from the provider-reported `usage` chunk
+ * (cache hit / miss are already disjoint, matching DeepSeek's own billing
+ * vocabulary). The cost figure is an ESTIMATE in CNY (CNY) computed from
+ * DeepSeek's public list prices; see PRICING below.
+ */
+
+const PRICING = {
+  // CNY per 1M tokens (public list prices, 2026-08 snapshot; source:
+  // https://api-docs.deepseek.com/zh-cn/quick_start/pricing/).
+  // cache write is not billed separately by DeepSeek, so it is excluded.
+  'deepseek-v4-flash': { hit: 0.02, miss: 1, output: 2 },
+  'deepseek-v4-pro': { hit: 0.025, miss: 3, output: 6 },
+  'deepseek-chat': { hit: 0.5, miss: 2, output: 8 },
+  'deepseek-reasoner': { hit: 1, miss: 4, output: 16 },
+}
+
+const DEFAULT_PRICE = PRICING['deepseek-v4-flash']
+const HOURLY_KEEP_MS = 48 * 3600 * 1000
+const DAILY_KEEP_MS = 14 * 86400 * 1000
+
+module.exports = {
+  name: 'ds-api-usage',
+  inject: ['timer'],
+
+  apply(ctx) {
+    const hourly = new Map()
+    const daily = new Map()
+    const startedAt = Date.now()
+
+    const hourKey = (ts) => {
+      const d = new Date(ts)
+      d.setMinutes(0, 0, 0)
+      return d.getTime()
+    }
+    const dayKey = (ts) => {
+      const d = new Date(ts)
+      d.setHours(0, 0, 0, 0)
+      return d.getTime()
+    }
+    const emptyBucket = (ts) => ({
+      ts,
+      requests: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      reasoningTokens: 0,
+      costCny: 0,
+    })
+
+    function recordUsage(options, usage) {
+      const now = Date.now()
+      const hk = hourKey(now)
+      const dk = dayKey(now)
+      let h = hourly.get(hk)
+      if (!h) {
+        h = emptyBucket(hk)
+        hourly.set(hk, h)
+      }
+      let d = daily.get(dk)
+      if (!d) {
+        d = emptyBucket(dk)
+        daily.set(dk, d)
+      }
+      const p = PRICING[options && options.model] || DEFAULT_PRICE
+      const input = usage.inputTokens || 0
+      const output = usage.outputTokens || 0
+      const cacheRead = usage.cacheReadTokens || 0
+      const cacheWrite = usage.cacheWriteTokens || 0
+      const reasoning = usage.reasoningTokens || 0
+      // cache hit is cheap, cache miss is full price, cache write is free; unit: CNY
+      const cost = (input * p.miss + cacheRead * p.hit + output * p.output) / 1e6
+      for (const b of [h, d]) {
+        b.requests += 1
+        b.inputTokens += input
+        b.outputTokens += output
+        b.cacheReadTokens += cacheRead
+        b.cacheWriteTokens += cacheWrite
+        b.reasoningTokens += reasoning
+        b.costCny += cost
+      }
+      for (const k of hourly.keys()) if (k < now - HOURLY_KEEP_MS) hourly.delete(k)
+      for (const k of daily.keys()) if (k < now - DAILY_KEEP_MS) daily.delete(k)
+    }
+
+    // Listen to every real model call. This is a waterfall event: MUST call
+    // next() and forward the stream, otherwise the model call breaks.
+    ctx.on('llm/stream', (options, next) => {
+      const inner = next()
+      return (async function* () {
+        for await (const chunk of inner) {
+          if (chunk && chunk.type === 'usage' && chunk.usage) {
+            try {
+              recordUsage(options, chunk.usage)
+            } catch (e) {
+              // accounting must never break the stream
+            }
+          }
+          yield chunk
+        }
+      })()
+    })
+
+    // ── balance ──────────────────────────────────────────────────────────────
+    // Reuse the deployment's own DeepSeek credential. `web.fetch` cannot send
+    // an Authorization header, so we shell out to curl via the subprocess seam.
+    let balanceCache = { ok: false, error: 'not fetched yet', fetchedAt: 0 }
+
+    async function fetchBalance(force) {
+      if (!force && balanceCache.fetchedAt && Date.now() - balanceCache.fetchedAt < 30000) {
+        return balanceCache
+      }
+      const credentials = ctx.get('credentials')
+      const subprocess = ctx.get('subprocess')
+      if (!credentials || !subprocess) {
+        balanceCache = { ok: false, error: 'credentials/subprocess service unavailable', fetchedAt: Date.now() }
+        return balanceCache
+      }
+      try {
+        const cred = await credentials.resolve('DEEPSEEK_API_KEY')
+        if (!cred) {
+          balanceCache = { ok: false, error: 'DEEPSEEK_API_KEY credential not configured', fetchedAt: Date.now() }
+          return balanceCache
+        }
+        const sandboxPolicy = ctx.get('sandboxPolicy')
+        const cwd = sandboxPolicy ? sandboxPolicy.workspaceRoot : '/'
+        const handle = subprocess.spawn({
+          argv: [
+            'curl', '-sS', '--max-time', '15',
+            '-H', 'Authorization: Bearer ' + cred.value,
+            'https://api.deepseek.com/user/balance',
+          ],
+          cwd,
+          stdio: {
+            stdin: 'ignore',
+            stdout: { maxBytes: 65536 },
+            stderr: { maxBytes: 4096 },
+          },
+          graceMs: 20000,
+        })
+        const outcome = await handle.done
+        const out = handle.collected && handle.collected.stdout
+          ? handle.collected.stdout.readFrom(0).text
+          : ''
+        if (outcome.exitCode !== 0 || !out) {
+          const err = handle.collected && handle.collected.stderr
+            ? handle.collected.stderr.readFrom(0).text
+            : ''
+          balanceCache = {
+            ok: false,
+            error: 'curl exit ' + String(outcome.exitCode) + (err ? ': ' + err.slice(0, 200) : ''),
+            fetchedAt: Date.now(),
+          }
+          return balanceCache
+        }
+        const json = JSON.parse(out)
+        const info = (json.balance_infos && json.balance_infos[0]) || {}
+        balanceCache = {
+          ok: true,
+          isAvailable: !!json.is_available,
+          currency: info.currency || 'CNY',
+          total: info.total_balance,
+          granted: info.granted_balance,
+          toppedUp: info.topped_up_balance,
+          fetchedAt: Date.now(),
+        }
+      } catch (e) {
+        balanceCache = { ok: false, error: String((e && e.message) || e), fetchedAt: Date.now() }
+      }
+      return balanceCache
+    }
+
+    // refresh the balance every 60s silently; fetch once on startup
+    ctx.interval(() => { fetchBalance(false).catch(() => {}) }, 60000)
+    fetchBalance(false).catch(() => {})
+
+    // ── RPC for the Client half ──────────────────────────────────────────────
+    harness.handle('dsapi:snapshot', async (args) => {
+      const force = !!(args && args.force)
+      const balance = await fetchBalance(force)
+      const now = Date.now()
+      const hourlyList = [...hourly.values()]
+        .filter((b) => b.ts >= now - 24 * 3600 * 1000)
+        .sort((a, b) => a.ts - b.ts)
+      const dailyList = [...daily.values()].sort((a, b) => a.ts - b.ts).slice(-14)
+      const totals = hourlyList.reduce((acc, b) => {
+        acc.requests += b.requests
+        acc.inputTokens += b.inputTokens
+        acc.outputTokens += b.outputTokens
+        acc.cacheReadTokens += b.cacheReadTokens
+        acc.cacheWriteTokens += b.cacheWriteTokens
+        acc.reasoningTokens += b.reasoningTokens
+        acc.costCny += b.costCny
+        return acc
+      }, emptyBucket(0))
+      return {
+        balance,
+        startedAt,
+        now,
+        totals,
+        hourly: hourlyList,
+        daily: dailyList,
+        pricingNote: 'Cost is an estimate in CNY from DeepSeek public list prices (cache hit / miss / output); for reference only.',
+      }
+    })
+  },
+}
