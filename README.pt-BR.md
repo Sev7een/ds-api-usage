@@ -97,7 +97,16 @@ npm test        # suíte de testes offline: parser de preços (fixtures) + lógi
 ```
 
 - Os preços são rastreados automaticamente: `.github/workflows/update-pricing.yml` (cron diário + acionamento manual) re-parseia as páginas oficiais de preços e abre um PR quando a tabela muda; `npm run update:pricing` faz o mesmo localmente (`--apply` grava o bloco gerado em `src/index.js`). Edite a tabela apenas pelo script — o bloco entre os marcadores `__PRICING_BEGIN__` / `__PRICING_END__` é gerado.
-- O client atualmente tem os rótulos em português (pt-BR) embutidos no código (sem i18n); se for contribuir de volta, localize-os via o serviço `locale`.
+- O client localiza via o serviço `locale` do harness (namespace `settings.ds-api-usage`) e acompanha o idioma ativo do harness: há dicionários para os ids `zh`/`en` do harness e uma entrada `pt-BR` para suporte futuro (chaves ausentes no idioma ativo caem no `zh`).
+
+## CI / GitHub Actions
+
+O repositório traz dois workflows — nenhum segredo ou chave de API é necessário, e o único pré-requisito é o GitHub Actions estar habilitado no repositório (padrão; confira em **Settings → Actions → General → Allow all actions**):
+
+- **`ci.yml`** — roda em todo push e pull request: `npm run check` (sintaxe das duas metades) e `npm test` (suíte offline com fixtures das páginas).
+- **`update-pricing.yml`** — re-parseia as páginas oficiais de preços da DeepSeek diariamente (cron 06:23 UTC) e por acionamento manual (**Actions → update-pricing → Run workflow**). Quando a tabela muda, abre um PR com o bloco regenerado (o workflow declara `contents: write` e `pull-requests: write` no `GITHUB_TOKEN` padrão — nada a configurar). Se a página de docs for reestruturada, a validação do parser falha e o job falha ruidosamente, em vez de abrir um PR errado.
+
+Após o primeiro push, rode **Actions → update-pricing → Run workflow** uma vez para validar o pipeline de ponta a ponta (resultado `no change` é o desfecho verde esperado quando os preços estão atualizados).
 
 ## Licença
 

@@ -97,7 +97,16 @@ npm test        # 离线测试套件：定价解析器（fixtures）+ peak/off-p
 ```
 
 - 价格自动跟踪：`.github/workflows/update-pricing.yml`（每日 cron + 手动触发）会重新解析官方定价页，表有变化时自动开启 PR；`npm run update:pricing` 可本地执行同样操作（`--apply` 写入 `src/index.js` 中的生成块）。请只通过脚本修改表格——`__PRICING_BEGIN__` / `__PRICING_END__` 标记之间的块为生成内容。
-- Client 目前硬编码巴西葡萄牙语标签；若回馈上游，可通过 `locale` 服务做国际化。
+- Client 通过 harness 的 `locale` 服务本地化（命名空间 `settings.ds-api-usage`），并跟随 harness 的当前语言：提供 harness 的 `zh`/`en` 词典及 `pt-BR` 条目（为将来 harness 支持预留；当前语言缺少的键会回退到 `zh`）。
+
+## CI / GitHub Actions
+
+仓库自带两个工作流——无需任何密钥或 API key，唯一前提是仓库已启用 GitHub Actions（默认；可在 **Settings → Actions → General → Allow all actions** 确认）：
+
+- **`ci.yml`** — 每次 push 与 pull request 都会运行：`npm run check`（两端语法检查）与 `npm test`（基于页面 fixtures 的离线测试套件）。
+- **`update-pricing.yml`** — 每天（06:23 UTC cron）及手动触发（**Actions → update-pricing → Run workflow**）重新解析 DeepSeek 官方定价页；表格变化时自动开启 PR（工作流在默认 `GITHUB_TOKEN` 上声明了 `contents: write` 与 `pull-requests: write`，无需额外配置）。若文档页改版，解析校验会失败并让 job 响亮地失败，而不会开出错误的 PR。
+
+首次 push 后，请手动运行一次 **Actions → update-pricing → Run workflow** 以端到端验证整个流程（价格未变时，`no change` 是预期的绿色结果）。
 
 ## 许可证
 

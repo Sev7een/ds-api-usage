@@ -101,7 +101,16 @@ npm test        # offline test suite: pricing parser (fixtures) + peak/off-peak 
 ```
 
 - Prices are auto-tracked: `.github/workflows/update-pricing.yml` (daily cron + manual dispatch) re-parses the official pricing pages and opens a PR when the table changes; `npm run update:pricing` does the same locally (`--apply` writes the generated block in `src/index.js`). Edit the table only through the script — the block between the `__PRICING_BEGIN__` / `__PRICING_END__` markers is generated.
-- The client currently hard-codes Brazilian Portuguese labels; localize via the `locale` service if contributed back.
+- The client localizes through the harness `locale` service (namespace `settings.ds-api-usage`) and follows the harness's active locale: dictionaries ship for the harness's `zh`/`en` ids plus a `pt-BR` entry for future harness support (keys missing in the active locale fall back to `zh`).
+
+## CI / GitHub Actions
+
+The repository ships two workflows — no secrets or API keys are required, and the only prerequisite is GitHub Actions being enabled for the repository (default; check **Settings → Actions → General → Allow all actions**):
+
+- **`ci.yml`** — runs on every push and pull request: `npm run check` (syntax of both halves) and `npm test` (offline test suite with page fixtures).
+- **`update-pricing.yml`** — re-parses the official DeepSeek pricing pages every day (06:23 UTC cron) and on manual dispatch (**Actions → update-pricing → Run workflow**). When the table changes it opens a PR with the regenerated block (the workflow declares `contents: write` and `pull-requests: write` on the default `GITHUB_TOKEN` — nothing to configure). If the docs page is restructured, the parser validation fails and the job fails loudly instead of opening a bad PR.
+
+After the first push, run **Actions → update-pricing → Run workflow** once to validate the pipeline end-to-end (a `no change` result is the expected, green outcome when prices are current).
 
 ## License
 
