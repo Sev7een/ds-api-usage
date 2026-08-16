@@ -2,13 +2,13 @@
 
 [English](./README.md) | [简体中文](./README.zh-CN.md) | **Português (Brasil)**
 
-Após a instalação, abra **Configurações → Uso da API** no [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) para visualizar o uso da sua API DeepSeek. A página mostra o saldo da sua conta, o gasto estimado, as contagens de tokens e o número de requisições de API nas últimas 24 horas, renderizados como um gráfico de barras em linha do tempo, semelhante à página oficial de uso da plataforma DeepSeek.
+Após a instalação, abra **Configurações → Uso da API** no [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) para visualizar o uso da sua API DeepSeek. A página mostra o saldo da sua conta, o gasto estimado, as contagens de tokens e o número de requisições de API nas últimas 24 horas (14 dias na visão diária), renderizados como um gráfico de barras em linha do tempo, semelhante à página oficial de uso da plataforma DeepSeek.
 
 ## Recursos
 
-- 💰 **Cartão de saldo** — saldo total com divisão entre concedido / recarregado, além de um selo de disponibilidade, obtido do endpoint oficial [`GET /user/balance`](https://api-docs.deepseek.com/api/get-user-balance/).
+- 💰 **Cartão de saldo** — saldo total com divisão entre concedido / recarregado (com o código da moeda informado pela API, CNY ou USD), além de um selo de disponibilidade, obtido do endpoint oficial [`GET /user/balance`](https://api-docs.deepseek.com/api/get-user-balance/).
 - 📊 **Cartões de métricas** — gasto estimado em 24h (CNY), contagens de tokens (divisão entrada / saída) e número de requisições de API.
-- 📈 **Gráfico de linha do tempo** — barras por hora do gasto estimado nas últimas 24 horas (passe o mouse para ver os valores exatos).
+- 📈 **Gráfico de linha do tempo** — barras por hora nas últimas 24 horas, ou por dia em 14 dias, alternando entre custo, tokens e requisições (passe o mouse para ver os valores exatos).
 - 🔄 **Atualização ao vivo** — o saldo é atualizado a cada 60 s no host; a página consulta a cada 30 s e tem um botão de atualização manual.
 - 🔑 **Sem configuração extra de chave** — reutiliza a credencial `DEEPSEEK_API_KEY` já existente na implantação por meio do serviço `credentials` do harness.
 
@@ -30,9 +30,10 @@ Após a instalação, abra **Configurações → Uso da API** no [DeepSeek Harne
                               ▼
 ┌────────────────────────────── Client (navegador) ────────────────────────────┐
 │ client/bundle.js (bundle web; client/index.js = fonte do plugin dinâmico)   │
-│  • slots.inject('settings.section')  → nova página de configs "Uso da API"  │
-│  • cartão de saldo + 3 cartões de métricas + gráfico de barras de 24h        │
-│  • auto-atualização a cada 30 s via ctx.interval                             │
+│  • slots.inject('settings.section')  → nova página (rótulo via serviço locale│
+│  • cartão de saldo + 3 cartões de métricas + gráfico de barras               │
+│      (custo / tokens / requisições; 24h ou 14d)                              │
+│  • auto-atualização a cada 30 s (setInterval nativo no bundle estático)      │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 

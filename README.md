@@ -2,13 +2,13 @@
 
 **English** | [简体中文](./README.zh-CN.md) | [Português (Brasil)](./README.pt-BR.md)
 
-After installation, open **Settings → API Usage** in [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) to view your DeepSeek API usage. The page shows your account balance, estimated spend, token counts, and API request count over the last 24 hours, rendered as a timeline bar chart similar to the official DeepSeek platform usage page.
+After installation, open **Settings → API Usage** in [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) to view your DeepSeek API usage. The page shows your account balance, estimated spend, token counts, and API request count over the last 24 hours (14 days in the daily view), rendered as a timeline bar chart similar to the official DeepSeek platform usage page.
 
 ## Features
 
-- 💰 **Balance card** — total balance with granted / topped-up split, plus an availability badge, fetched from the official [`GET /user/balance`](https://api-docs.deepseek.com/api/get-user-balance/) endpoint.
+- 💰 **Balance card** — total balance with granted / topped-up split, labeled with the API-reported currency code (CNY or USD), plus an availability badge, fetched from the official [`GET /user/balance`](https://api-docs.deepseek.com/api/get-user-balance/) endpoint.
 - 📊 **Metric cards** — 24h estimated spend (CNY), token counts (input / output split), and API request count.
-- 📈 **Timeline chart** — hourly bars of estimated spend over the last 24 hours (hover for exact values).
+- 📈 **Timeline chart** — hourly bars over the last 24 hours, or daily bars over 14 days, toggled between cost, tokens, and request counts (hover for exact values).
 - 🔄 **Live refresh** — balance refreshes every 60 s on the host; the page polls every 30 s and has a manual refresh button.
 - 🔑 **No extra key setup** — reuses the deployment's existing `DEEPSEEK_API_KEY` credential through the harness `credentials` service.
 
@@ -30,9 +30,10 @@ After installation, open **Settings → API Usage** in [DeepSeek Harness](https:
                               ▼
 ┌────────────────────────────── Client (browser) ─────────────────────────────┐
 │ client/bundle.js (web bundle; client/index.js = dynamic-plugin source)      │
-│  • slots.inject('settings.section')  → new settings page "API用量"             │
-│  • balance card + 3 metric cards + 24h timeline bar chart                   │
-│  • auto-refresh every 30 s via ctx.interval                                 │
+│  • slots.inject('settings.section')  → new settings page (localized label)   │
+│  • balance card + 3 metric cards + timeline bar chart                       │
+│      (cost / tokens / requests; 24h or 14d)                                 │
+│  • auto-refresh every 30 s (native setInterval in the static bundle)        │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 

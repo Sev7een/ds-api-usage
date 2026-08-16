@@ -2,13 +2,13 @@
 
 [English](./README.md) | **简体中文** | [Português (Brasil)](./README.pt-BR.md)
 
-安装后，打开 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 的**设置 → API用量**页面，即可查看 DeepSeek API 用量。页面展示账户余额、最近 24 小时的估算消费金额、Token 数量与 API 请求次数，并以类似 DeepSeek 官方平台用量页的时间线柱状图呈现。
+安装后，打开 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 的**设置 → API用量**页面，即可查看 DeepSeek API 用量。页面展示账户余额、最近 24 小时（日视图为 14 天）的估算消费金额、Token 数量与 API 请求次数，并以类似 DeepSeek 官方平台用量页的时间线柱状图呈现。
 
 ## 功能特性
 
-- 💰 **余额卡片** — 总余额（赠送 / 充值分项）+ 可用状态徽标，数据来自官方 [`GET /user/balance`](https://api-docs.deepseek.com/api/get-user-balance/) 接口。
+- 💰 **余额卡片** — 总余额（赠送 / 充值分项，标注 API 返回的货币代码 CNY 或 USD）+ 可用状态徽标，数据来自官方 [`GET /user/balance`](https://api-docs.deepseek.com/api/get-user-balance/) 接口。
 - 📊 **指标卡片** — 24h 估算消费（人民币 CNY）、Token 数量（输入 / 输出分项）、API 请求次数。
-- 📈 **时间线图表** — 最近 24 小时按小时聚合的消费金额柱状图（悬停查看精确数值）。
+- 📈 **时间线图表** — 最近 24 小时按小时聚合、或 14 天按日聚合的柱状图，可在消费 / Tokens / 请求数之间切换（悬停查看精确数值）。
 - 🔄 **实时刷新** — Host 端每 60 秒刷新余额；页面每 30 秒轮询，并提供手动刷新按钮。
 - 🔑 **无需额外配置密钥** — 复用部署中已有的 `DEEPSEEK_API_KEY` 凭证（通过 harness 的 `credentials` 服务）。
 
@@ -30,9 +30,10 @@
                               ▼
 ┌────────────────────────────── Client（浏览器）───────────────────────────────┐
 │ client/bundle.js（web bundle；client/index.js 为动态插件源码）               │
-│  • slots.inject('settings.section')  → 新增设置页「API用量」                   │
-│  • 余额卡片 + 3 张指标卡 + 24h 时间线柱状图                                  │
-│  • 每 30 秒通过 ctx.interval 自动刷新                                        │
+│  • slots.inject('settings.section')  → 新增设置页（标签经 locale 服务本地化）        │
+│  • 余额卡片 + 3 张指标卡 + 时间线柱状图                                      │
+│      （消费 / Tokens / 请求；24h 或 14d）                              │
+│  • 每 30 秒自动刷新（静态 bundle 使用原生 setInterval）                            │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
