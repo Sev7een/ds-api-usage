@@ -1,14 +1,14 @@
 # DHS API Usage — DeepSeek Harness plugin
 
-**English** | [简体中文](./README.zh-CN.md)
+**English** | [简体中文](./README.zh-CN.md) | [Português (Brasil)](./README.pt-BR.md)
 
-After installation, open **Settings → API Usage** in [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) to view your DeepSeek API usage. The page shows your account balance, estimated spend, token counts, and API request count over the last 24 hours, rendered as a timeline bar chart similar to the official DeepSeek platform usage page.
+After installation, open **Settings → API Usage** in [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) to view your DeepSeek API usage. The page shows your account balance, estimated spend, token counts, and API request count over the last 24 hours (14 days in the daily view), rendered as a timeline bar chart similar to the official DeepSeek platform usage page.
 
 ## Features
 
-- 💰 **Balance card** — total balance with granted / topped-up split, plus an availability badge, fetched from the official [`GET /user/balance`](https://api-docs.deepseek.com/api/get-user-balance/) endpoint.
+- 💰 **Balance card** — total balance with granted / topped-up split, labeled with the API-reported currency code (CNY or USD), plus an availability badge, fetched from the official [`GET /user/balance`](https://api-docs.deepseek.com/api/get-user-balance/) endpoint.
 - 📊 **Metric cards** — 24h estimated spend (CNY), token counts (input / output split), and API request count.
-- 📈 **Timeline chart** — hourly bars of estimated spend over the last 24 hours (hover for exact values).
+- 📈 **Timeline chart** — hourly bars over the last 24 hours, or daily bars over 14 days, toggled between cost, tokens, and request counts (hover for exact values).
 - 🔄 **Live refresh** — balance refreshes every 60 s on the host; the page polls every 30 s and has a manual refresh button.
 - 🔑 **No extra key setup** — reuses the deployment's existing `DEEPSEEK_API_KEY` credential through the harness `credentials` service.
 
@@ -30,21 +30,23 @@ After installation, open **Settings → API Usage** in [DeepSeek Harness](https:
                               ▼
 ┌────────────────────────────── Client (browser) ─────────────────────────────┐
 │ client/bundle.js (web bundle; client/index.js = dynamic-plugin source)      │
-│  • slots.inject('settings.section')  → new settings page "API用量"             │
-│  • balance card + 3 metric cards + 24h timeline bar chart                   │
-│  • auto-refresh every 30 s via ctx.interval                                 │
+│  • slots.inject('settings.section')  → new settings page (localized label)   │
+│  • balance card + 3 metric cards + timeline bar chart                       │
+│      (cost / tokens / requests; 24h or 14d)                                 │
+│  • auto-refresh every 30 s (native setInterval in the static bundle)        │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### Data notes
 
 - **Token counts are real** — they come from the `usage` chunk of every streaming model call (`StreamChunk` with `type: 'usage'`, `TokenUsage`), the same provider-reported numbers the harness itself uses for session stats.
-- **Cost is an estimate** — CNY is computed from DeepSeek's public list prices (Chinese docs, [模型 & 价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)) in `PRICING` (`src/index.js`), applied per model:
+- **Cost is an estimate** — CNY is computed from DeepSeek's public list prices ([模型 & 价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)) in the generated `PRICING` table (`src/index.js`), applied per model:
   - cache hit input → `hit` price
   - cache miss input → `miss` price
   - output → `output` price
   - cache write is not billed separately by DeepSeek and is excluded.
-- **In-memory only** — hourly buckets keep 48 h, daily keep 14 d; all data resets when the plugin (re)starts. No persistence is added on purpose: the harness has its own durable token-usage projection for sessions; this plugin is a live dashboard.
+  - since 2026-08-16 DeepSeek bills peak / off-peak: models with `peak` / `offPeak` rates are priced by the request's UTC hour (windows in `peakHoursUtc`; 01:00–04:00 and 06:00–10:00 UTC); the rest use their `flat` rate.
+- **Persisted aggregation** — hourly buckets keep 48 h, daily keep 14 d, persisted to `$DSH_HOME/storages/ds-api-usage.json` (writes debounced to at most one per 60 s, flushed on plugin shutdown, fail-safe: a read/write error never breaks accounting). The 14-day view therefore survives web-app restarts; delete the file to reset. The harness separately keeps its own durable per-session token projection.
 
 ## Installation
 
@@ -96,10 +98,20 @@ or, without installing the package, by a relative path to this repository. The p
 
 ```bash
 npm run check   # syntax-check both halves
+npm test        # offline test suite: pricing parser (fixtures) + peak/off-peak rate logic
 ```
 
-- Prices may drift: update `PRICING` in `src/index.js` when DeepSeek changes list prices (the constant is annotated with its snapshot date).
-- The client currently hard-codes English labels; localize via the `locale` service if contributed back.
+- Prices are auto-tracked: `.github/workflows/update-pricing.yml` (daily cron + manual dispatch) re-parses the official pricing pages and opens a PR when the table changes; `npm run update:pricing` does the same locally (`--apply` writes the generated block in `src/index.js`). Edit the table only through the script — the block between the `__PRICING_BEGIN__` / `__PRICING_END__` markers is generated.
+- The client localizes through the harness `locale` service (namespace `settings.ds-api-usage`) and follows the harness's active locale: dictionaries ship for the harness's `zh`/`en` ids plus a `pt-BR` entry for future harness support (keys missing in the active locale fall back to `zh`).
+
+## CI / GitHub Actions
+
+The repository ships two workflows — no secrets or API keys are required, and the only prerequisite is GitHub Actions being enabled for the repository (default; check **Settings → Actions → General → Allow all actions**):
+
+- **`ci.yml`** — runs on every push and pull request: `npm run check` (syntax of both halves) and `npm test` (offline test suite with page fixtures).
+- **`update-pricing.yml`** — re-parses the official DeepSeek pricing pages every day (06:23 UTC cron) and on manual dispatch (**Actions → update-pricing → Run workflow**). When the table changes it opens a PR with the regenerated block (the workflow declares `contents: write` and `pull-requests: write` on the default `GITHUB_TOKEN` — nothing to configure). If the docs page is restructured, the parser validation fails and the job fails loudly instead of opening a bad PR.
+
+After the first push, run **Actions → update-pricing → Run workflow** once to validate the pipeline end-to-end (a `no change` result is the expected, green outcome when prices are current).
 
 ## License
 

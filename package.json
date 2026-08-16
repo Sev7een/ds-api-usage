@@ -32,7 +32,9 @@
     "cordis.patch.yml"
   ],
   "scripts": {
-    "check": "node --check src/index.js && node --check client/bundle.js"
+    "check": "node --check src/index.js && node --check client/bundle.js",
+    "test": "node --test test/*.test.mjs",
+    "update:pricing": "node .github/scripts/update-pricing.mjs --apply"
   },
   "engines": {
     "node": ">=20"
