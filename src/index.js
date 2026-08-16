@@ -123,17 +123,92 @@ function rateFor(model, ts) {
 const HOURLY_KEEP_MS = 48 * 3600 * 1000
 const DAILY_KEEP_MS = 14 * 86400 * 1000
 
+// ── persistence ───────────────────────────────────────────────────────────────
+// Hourly/daily buckets are persisted to `$DSH_HOME/storages/ds-api-usage.json`
+// so the 14-day view survives web-app restarts. Writes are debounced (max one
+// per 60 s) and flushed synchronously on plugin dispose; any read/write error
+// is swallowed so persistence never breaks accounting. The dynamic sandbox
+// form has no node:fs — there persistence is skipped silently.
+let fsMod = null
+let osMod = null
+let pathMod = null
+try {
+  fsMod = require('node:fs')
+  osMod = require('node:os')
+  pathMod = require('node:path')
+} catch (e) { /* sandboxed dynamic form: no fs */ }
+
+function bucketsFilePath() {
+  if (!fsMod || !pathMod) return null
+  const home = process.env.DSH_HOME || (osMod.homedir() + '/.dsh')
+  return home ? pathMod.join(home, 'storages', 'ds-api-usage.json') : null
+}
+
+function serializeBuckets(hourly, daily) {
+  return { v: 1, hourly: [...hourly.values()], daily: [...daily.values()] }
+}
+
+function parseBuckets(json) {
+  if (!json || json.v !== 1) return null
+  const valid = (b) => b && typeof b === 'object'
+    && Number.isFinite(b.ts) && Number.isFinite(b.requests)
+    && Number.isFinite(b.inputTokens) && Number.isFinite(b.outputTokens)
+    && Number.isFinite(b.cacheReadTokens) && Number.isFinite(b.cacheWriteTokens)
+    && Number.isFinite(b.reasoningTokens) && Number.isFinite(b.costCny)
+  const hourly = new Map()
+  const daily = new Map()
+  for (const b of Array.isArray(json.hourly) ? json.hourly : []) if (valid(b)) hourly.set(b.ts, b)
+  for (const b of Array.isArray(json.daily) ? json.daily : []) if (valid(b)) daily.set(b.ts, b)
+  return { hourly, daily }
+}
+
+// Seed missing keys only: in-memory data (current session) always wins.
+function mergeMaps(target, source) {
+  for (const [ts, bucket] of source) if (!target.has(ts)) target.set(ts, bucket)
+}
+
+function pruneMaps(hourly, daily, now) {
+  for (const k of hourly.keys()) if (k < now - HOURLY_KEEP_MS) hourly.delete(k)
+  for (const k of daily.keys()) if (k < now - DAILY_KEEP_MS) daily.delete(k)
+}
+
 module.exports = {
   name: 'ds-api-usage',
   inject: ['timer', 'webServer'],
   // Exposed for the offline test suite only (test/pricing.test.mjs); Cordis
   // ignores unknown export properties.
-  __test: { PRICING, DEFAULT_RATE, rateFor },
+  __test: { PRICING, DEFAULT_RATE, rateFor, serializeBuckets, parseBuckets, mergeMaps, pruneMaps, bucketsFilePath },
 
   apply(ctx) {
     const hourly = new Map()
     const daily = new Map()
     const startedAt = Date.now()
+
+    // ── load persisted buckets (if any), then prune stale windows ─────────────
+    const bucketsFile = bucketsFilePath()
+    if (bucketsFile && fsMod.existsSync(bucketsFile)) {
+      try {
+        const loaded = parseBuckets(JSON.parse(fsMod.readFileSync(bucketsFile, 'utf8')))
+        if (loaded) {
+          mergeMaps(hourly, loaded.hourly)
+          mergeMaps(daily, loaded.daily)
+        }
+      } catch (e) { /* corrupted file: start fresh */ }
+    }
+    pruneMaps(hourly, daily, Date.now())
+
+    let dirty = false
+    const persist = () => {
+      if (!dirty || !bucketsFile || !fsMod) return
+      try {
+        const tmp = bucketsFile + '.tmp'
+        fsMod.writeFileSync(tmp, JSON.stringify(serializeBuckets(hourly, daily)))
+        fsMod.renameSync(tmp, bucketsFile)
+        dirty = false
+      } catch (e) { /* persistence must never break accounting */ }
+    }
+    ctx.interval(() => { if (dirty) persist() }, 60000)
+    ctx.effect(() => () => persist()) // flush on dispose
 
     const hourKey = (ts) => {
       const d = new Date(ts)
@@ -189,6 +264,7 @@ module.exports = {
       }
       for (const k of hourly.keys()) if (k < now - HOURLY_KEEP_MS) hourly.delete(k)
       for (const k of daily.keys()) if (k < now - DAILY_KEEP_MS) daily.delete(k)
+      dirty = true
     }
 
     // Listen to every real model call. This is a waterfall event: MUST call

@@ -46,7 +46,7 @@ After installation, open **Settings → API Usage** in [DeepSeek Harness](https:
   - output → `output` price
   - cache write is not billed separately by DeepSeek and is excluded.
   - since 2026-08-16 DeepSeek bills peak / off-peak: models with `peak` / `offPeak` rates are priced by the request's UTC hour (windows in `peakHoursUtc`; 01:00–04:00 and 06:00–10:00 UTC); the rest use their `flat` rate.
-- **In-memory only** — hourly buckets keep 48 h, daily keep 14 d; all data resets when the plugin (re)starts. No persistence is added on purpose: the harness has its own durable token-usage projection for sessions; this plugin is a live dashboard.
+- **Persisted aggregation** — hourly buckets keep 48 h, daily keep 14 d, persisted to `$DSH_HOME/storages/ds-api-usage.json` (writes debounced to at most one per 60 s, flushed on plugin shutdown, fail-safe: a read/write error never breaks accounting). The 14-day view therefore survives web-app restarts; delete the file to reset. The harness separately keeps its own durable per-session token projection.
 
 ## Installation
 

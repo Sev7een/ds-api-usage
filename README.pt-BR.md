@@ -46,7 +46,7 @@ Após a instalação, abra **Configurações → Uso da API** no [DeepSeek Harne
   - saída → preço `output`
   - escrita de cache não é cobrada separadamente pela DeepSeek e é excluída.
   - desde 16/08/2026 a DeepSeek cobra por peak / off-peak: modelos com preços `peak` / `offPeak` são precificados pela hora UTC da requisição (janelas em `peakHoursUtc`; 01:00–04:00 e 06:00–10:00 UTC); os demais usam o preço `flat`.
-- **Somente em memória** — buckets por hora retêm 48 h; por dia, 14 d; todos os dados são zerados quando o plugin é (re)iniciado. Nenhuma persistência é adicionada de propósito: o harness tem sua própria projeção durável de uso de tokens para sessões; este plugin é um painel ao vivo.
+- **Agregação persistida** — buckets por hora retêm 48 h e por dia 14 d, salvos em `$DSH_HOME/storages/ds-api-usage.json` (escrita com debounce de no máximo uma por 60 s, flush no encerramento do plugin, fail-safe: erro de leitura/escrita nunca quebra o accounting). A visão de 14 dias sobrevive a restarts do web app; apague o arquivo para zerar. O harness mantém separadamente sua própria projeção durável de tokens por sessão.
 
 ## Instalação
 
