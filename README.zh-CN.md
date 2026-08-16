@@ -1,6 +1,6 @@
 # DHS API Usage — DeepSeek Harness 插件
 
-[English](./README.md) | **简体中文**
+[English](./README.md) | **简体中文** | [Português (Brasil)](./README.pt-BR.md)
 
 安装后，打开 [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) 的**设置 → API用量**页面，即可查看 DeepSeek API 用量。页面展示账户余额、最近 24 小时的估算消费金额、Token 数量与 API 请求次数，并以类似 DeepSeek 官方平台用量页的时间线柱状图呈现。
 
@@ -39,11 +39,12 @@
 ### 数据说明
 
 - **Token 数量是真实的** — 来自每次流式模型调用的 `usage` chunk（`StreamChunk` 的 `type: 'usage'`、`TokenUsage`），与 harness 自身用于会话统计的 provider 上报数据完全一致。
-- **消费金额为估算** — 人民币（CNY）按 DeepSeek 官方公开价（中文文档，[模型 & 价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)）在 `PRICING`（`src/index.js`）中按模型计算：
+- **消费金额为估算** — 人民币（CNY）按 DeepSeek 官方公开价（中文文档，[模型 & 价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)）在生成的 `PRICING` 表（`src/index.js`）中按模型计算：
   - 缓存命中输入 → `hit` 单价
   - 缓存未命中输入 → `miss` 单价
   - 输出 → `output` 单价
   - DeepSeek 不单独对缓存写入计费，故未计入。
+  - 自 2026-08-16 起 DeepSeek 按高峰 / 空闲时段计费：带有 `peak` / `offPeak` 单价的模型按请求的 UTC 小时（`peakHoursUtc` 中的窗口：01:00–04:00 与 06:00–10:00 UTC）计费；其余模型使用 `flat` 单价。
 - **仅内存存储** — 按小时桶保留 48 小时，按天桶保留 14 天；插件（重新）启动时数据清零。有意不做持久化：harness 本身对会话已有持久化的 token 用量投影；本插件定位为实时仪表盘。
 
 ## 安装
@@ -92,10 +93,11 @@ dsh plugin --profile web add dsh-plugin-ds-api-usage
 
 ```bash
 npm run check   # 语法检查两个半端
+npm test        # 离线测试套件：定价解析器（fixtures）+ peak/off-peak 计费逻辑
 ```
 
-- 价格可能变动：DeepSeek 调整公开价时请更新 `src/index.js` 中的 `PRICING`（常量已注明快照日期）。
-- Client 目前硬编码中文标签；若回馈上游，可通过 `locale` 服务做国际化。
+- 价格自动跟踪：`.github/workflows/update-pricing.yml`（每日 cron + 手动触发）会重新解析官方定价页，表有变化时自动开启 PR；`npm run update:pricing` 可本地执行同样操作（`--apply` 写入 `src/index.js` 中的生成块）。请只通过脚本修改表格——`__PRICING_BEGIN__` / `__PRICING_END__` 标记之间的块为生成内容。
+- Client 目前硬编码巴西葡萄牙语标签；若回馈上游，可通过 `locale` 服务做国际化。
 
 ## 许可证
 

@@ -1,6 +1,6 @@
 # DHS API Usage — DeepSeek Harness plugin
 
-**English** | [简体中文](./README.zh-CN.md)
+**English** | [简体中文](./README.zh-CN.md) | [Português (Brasil)](./README.pt-BR.md)
 
 After installation, open **Settings → API Usage** in [DeepSeek Harness](https://github.com/deepseek-ai/DeepSeek-Harness) to view your DeepSeek API usage. The page shows your account balance, estimated spend, token counts, and API request count over the last 24 hours, rendered as a timeline bar chart similar to the official DeepSeek platform usage page.
 
@@ -39,11 +39,12 @@ After installation, open **Settings → API Usage** in [DeepSeek Harness](https:
 ### Data notes
 
 - **Token counts are real** — they come from the `usage` chunk of every streaming model call (`StreamChunk` with `type: 'usage'`, `TokenUsage`), the same provider-reported numbers the harness itself uses for session stats.
-- **Cost is an estimate** — CNY is computed from DeepSeek's public list prices (Chinese docs, [模型 & 价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)) in `PRICING` (`src/index.js`), applied per model:
+- **Cost is an estimate** — CNY is computed from DeepSeek's public list prices ([模型 & 价格](https://api-docs.deepseek.com/zh-cn/quick_start/pricing/)) in the generated `PRICING` table (`src/index.js`), applied per model:
   - cache hit input → `hit` price
   - cache miss input → `miss` price
   - output → `output` price
   - cache write is not billed separately by DeepSeek and is excluded.
+  - since 2026-08-16 DeepSeek bills peak / off-peak: models with `peak` / `offPeak` rates are priced by the request's UTC hour (windows in `peakHoursUtc`; 01:00–04:00 and 06:00–10:00 UTC); the rest use their `flat` rate.
 - **In-memory only** — hourly buckets keep 48 h, daily keep 14 d; all data resets when the plugin (re)starts. No persistence is added on purpose: the harness has its own durable token-usage projection for sessions; this plugin is a live dashboard.
 
 ## Installation
@@ -96,10 +97,11 @@ or, without installing the package, by a relative path to this repository. The p
 
 ```bash
 npm run check   # syntax-check both halves
+npm test        # offline test suite: pricing parser (fixtures) + peak/off-peak rate logic
 ```
 
-- Prices may drift: update `PRICING` in `src/index.js` when DeepSeek changes list prices (the constant is annotated with its snapshot date).
-- The client currently hard-codes English labels; localize via the `locale` service if contributed back.
+- Prices are auto-tracked: `.github/workflows/update-pricing.yml` (daily cron + manual dispatch) re-parses the official pricing pages and opens a PR when the table changes; `npm run update:pricing` does the same locally (`--apply` writes the generated block in `src/index.js`). Edit the table only through the script — the block between the `__PRICING_BEGIN__` / `__PRICING_END__` markers is generated.
+- The client currently hard-codes Brazilian Portuguese labels; localize via the `locale` service if contributed back.
 
 ## License
 

@@ -307,7 +307,7 @@ module.exports = {
         totals,
         hourly: hourlyList,
         daily: dailyList,
-        pricingNote: 'Cost is an estimate in CNY from DeepSeek public list prices (cache hit / miss / output); for reference only.',
+        pricingNote: 'Custo estimado em CNY a partir dos preços públicos da DeepSeek (cache hit / miss / saída; preços flat ou peak/off-peak conforme o horário UTC); apenas para referência.',
       }
     }
 
